@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Prediction Wizard</title>
+    <!-- <link rel="stylesheet" href="static/d3.slider.css" /> -->
+    <style>
+
+     body {
+       font-family: Verdana,Arial,sans-serif;
+     }
+
+     h2 {
+       font-size: 1.2em;
+       margin: 60px 0 5px 0;
+       color: gray
+     }
+
+     .space {
+       margin-bottom: 20 px;
+     }
+
+     .wrapper {
+       width: 800px;
+       margin-left: auto;
+       margin-right: auto;
+       margin-bottom: 0px;
+     }
+
+     #bar_chart {
+       margin-bottom: 0 px;
+     }
+
+     .bar {
+       fill: #FF75A3;
+     }
+
+     span {
+       color: steelblue;
+     }
+
+    </style>
+  </head>
+
+  <body>
+
+    <center>
+      <div id="chart_area" class="wrapper">
+        <h2>Names that Sound Similar</h2>
+        <p class="space"></p>
+        <div id="bar_chart">
+        </div>
+      </div>
+      <form id="frm1" method="post">
+        Name: <input type="text" id="fname">
+        <input type="button" onclick="myFunction()" value="Submit">
+      </form>
+    <div class="a"></div>
+    </center>
+    <!-- Import the libraries: jQuery, d3, d3.slider -->
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <!-- <script src="static/d3.slider.js"></script> -->
+
+    <script>
+
+     function myFunction(){
+       var name = document.forms["frm1"]["fname"].value;
+       d3.select("svg").remove()
+
+       $.ajax({
+         type: "POST",
+         contentType: "application/json; charset=utf-8",
+         url: "/names",
+         dataType: "json",
+         async: true,
+         data: "{\"example\": \""+name+"\"}",
+         success: function (data) {
+            var w = 500;
+            var h = 400;
+            var linkDistance=200;
+
+            var colors = d3.scale.category10();
+            var svg = d3.select("div.a").append("svg").attr({"width":w,"height":h});
+
+            force = d3.layout.force()
+                .nodes(data.nodes)
+                .links(data.edges)
+                .size([w,h])
+                .linkDistance(function(d){console.log(d.value);return 50*d.value;})
+                .charge([-500])
+                .theta(0.1)
+                .gravity(0.05)
+                .start();
+
+            var edges = svg.selectAll("line")
+              .data(data.edges)
+              .enter()
+              .append("line")
+              .attr("id",function(d,i) {return 'edge'+i})
+              .attr('marker-end','url(#arrowhead)')
+              .style("stroke","#ccc")
+              .style("stroke-opacity", function(d){ return Math.sqrt(d.value);})
+              .style("pointer-events", "none");
+
+            var nodes = svg.selectAll("circle")
+              .data(data.nodes)
+              .enter()
+              .append("circle")
+              .attr({"r":15})
+              .style("fill",function(d,i){return colors(i);})
+              .call(force.drag)
+
+
+            var nodelabels = svg.selectAll(".nodelabel")
+               .data(data.nodes)
+               .enter()
+               .append("text")
+               .attr({"x":function(d){return d.x;},
+                      "y":function(d){return d.y;},
+                      "class":"nodelabel",
+                      "stroke":"black"})
+               .text(function(d){return d.name;});
+
+            var edgepaths = svg.selectAll(".edgepath")
+                .data(data.edges)
+                .enter()
+                .append('path')
+                .attr({'d': function(d) {return 'M '+d.source.x+' '+d.source.y+' L '+ d.target.x +' '+d.target.y},
+                       'class':'edgepath',
+                       'fill-opacity':0,
+                       'stroke-opacity':0,
+                       'fill':'blue',
+                       'stroke':'red',
+                       'id':function(d,i) {return 'edgepath'+i}})
+                .style("pointer-events", "none");
+
+            svg.append('defs').append('marker')
+                .attr({'id':'arrowhead',
+                       'viewBox':'-0 -5 10 10',
+                       'refX':25,
+                       'refY':0,
+                       //'markerUnits':'strokeWidth',
+                       'orient':'auto',
+                       'markerWidth':10,
+                       'markerHeight':10,
+                       'xoverflow':'visible'})
+                .append('svg:path')
+                    .attr('d', 'M 0,-5 L 10 ,0 L 0,5')
+                    .attr('fill', '#ccc')
+                    .attr('stroke','#ccc');
+
+
+              force.on("tick", function(){
+
+                  edges.attr({"x1": function(d){return d.source.x;},
+                              "y1": function(d){return d.source.y;},
+                              "x2": function(d){return d.target.x;},
+                              "y2": function(d){return d.target.y;}
+                  });
+
+                  nodes.attr({"cx":function(d){return d.x;},
+                              "cy":function(d){return d.y;}
+                  });
+
+                  nodelabels.attr("x", function(d) { return d.x; })
+                            .attr("y", function(d) { return d.y; });
+
+                  edgepaths.attr('d', function(d) { var path='M '+d.source.x+' '+d.source.y+' L '+ d.target.x +' '+d.target.y;
+                                                     //console.log(d)
+                                                     return path});
+
+              });
+
+         },
+         error: function (result) {
+         }
+       })
+     }
+
+    </script>
+  </body>
+</html>
